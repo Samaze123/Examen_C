@@ -29,7 +29,7 @@ int main(int argc, char *argv[])
 
     if (!pid)
     {
-        // child code        
+        // child code
        
         if((close(pipeFD[0])) < 0) // close pipe reading
         {
@@ -41,20 +41,13 @@ int main(int argc, char *argv[])
         {
             perror("Dup2 STDERR error ");
             exit(errno);
-        } 
+        }
 
         if(!(dup2(pipeFD[1], STDOUT_FILENO)))// replace stdout
         {
             perror("Dup2 STDOUT error ");
-            exit(errno);            
-        } 
-
-        if((close(pipeFD[1])) < 0)
-        {
-            perror("Close pipe writing child error ");
             exit(errno);
         }
-
 
         char **commandLine = malloc((argc + 1) * sizeof(char *));
         
@@ -72,21 +65,31 @@ int main(int argc, char *argv[])
         {
             perror("Execlp child error ");
             exit(errno);
-        } 
+        }
+
+        write(pipeFD[1], "Bad command entered", strlen("Bad command entered"));
+
+        if((close(pipeFD[1])) < 0)
+        {
+            perror("child close pipe writing error ");
+            exit(errno);
+        }
+
+        exit(1);
     }
     else
     {
         // parent code
-        
-        int respons, status = 1, timeout = 2000, counter = 0; 
+
+        int respons, status = 1, timeout = 2000, counter = 0;
         char bufferData[PATH_MAX];
         struct stat sysStat;
 
-        if((close(pipeFD[1])) < 0) //close pipe writing 
+        if((close(pipeFD[1])) < 0) //close pipe writing
         {
             perror("Close pipe writing child error ");
             exit(errno);
-        } 
+        }
 
         while(WIFEXITED(status) == 0 && timeout > counter)
         {
