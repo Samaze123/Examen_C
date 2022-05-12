@@ -1,3 +1,6 @@
+#define SIZE_OF_BUFFER 5000
+
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -12,148 +15,160 @@
 
 int main(int argc, char *argv[])
 {
-    pid_t pid, childpid;
-    int pipeToParent[2], fd, waitStatus, counterWhile = 1, boolClosedPipeParent = 0;
-    char dataBuffer[2000] = "", *cmdLineStr, delimiter[2] = "\n";
+    // For each arguments
+    for (int fileCounter = 1; fileCounter < argc; ++fileCounter)
+    {   
+        pid_t pid;
+        int pipeToParent[2], fileDescrip, commandCounter = 1;
+        char dataBuffer[SIZE_OF_BUFFER] = "", *cmdLineStr, delimiter[2] = "\n";
 
-    if((fd = open(argv[1], O_RDONLY)) < 0) // file opening
-    {
-        perror("open error ");
-        exit(errno);
-    }
-
-    if((read(fd, dataBuffer, 2000)) < 0) // file reading
-    {
-        perror("read error ");
-        exit(errno);
-    }
-
-    if((close(fd)) < 0)
-    {
-        perror("close open error ");
-        exit(errno);
-    }
-
-    cmdLineStr = strtok(dataBuffer, delimiter); // strtok starting
-
-    if((pipe(pipeToParent)) < 0) // pipe creation
-    {
-        perror("pipe to parent error ");
-        exit(errno);
-    }
-
-    while (cmdLineStr != NULL) // while strtok returns NULL
-    {
-
-        if((pid = fork()) < 0) // fork creation
+        // Open the file
+        if((fileDescrip = open(argv[fileCounter], O_RDONLY)) < 0) // file opening
         {
-            perror("fork error ");
+            perror("Open file error ");
             exit(errno);
         }
 
-        if(pid)
+        // Read the file
+        if((read(fileDescrip, dataBuffer, SIZE_OF_BUFFER)) < 0) // file reading
         {
-            // parent
-            int waitRespons, status = 1, timeout = 2000, counter = 0, readRespons;
-            char pipeBuffer[2000] = "";
-            // if (boolClosedPipeParent == 0)
-            // {
-            //     if((close(pipeToParent[1])) < 0) //close pipe writing
-            //     {
-            //         perror("Close pipe writing parent error ");
-            //         exit(errno);
-            //     }
-            //     boolClosedPipeParent = 1;
-            // }
-
-            while(WIFEXITED(status) == 0 && timeout > counter)
-            {
-                waitRespons = waitpid(pid, &status, WNOHANG);
-                counter ++;
-                sleep(0.1);
-            }
-
-            if (timeout <= counter)
-            {
-                kill(pid, SIGKILL);
-            }
-
-            if((readRespons = read(pipeToParent[0], pipeBuffer, 2000)) < 0)
-            {
-                perror("parent read error ");
-                exit(errno);
-            }
-
-            printf("Results parent %d :\n%s \n\n\n\n", counterWhile, pipeBuffer);
-
-            // while(readRespons != 0)
-            // {
-                // printf("%s\n", pipeBuffer);
-            //     memset(pipeBuffer, 0, readRespons);
-            //     printf("read respons : %d\n", readRespons);
-            //     readRespons = read(pipeToParent[0], pipeBuffer, 2000);
-                
-                
-            //     // if((readRespons = read(pipeToParent[0], pipeBuffer, 2000)) < 0)
-            //     // {
-            //     //     perror("parent read error ");
-            //     //     exit(errno);
-            //     // }
-            // //     printf("ezeiuhezfiuhefziuhfze");
-            //     sleep(1);
-            // }
+            perror("Read file error ");
+            exit(errno);
         }
 
-        else
+        // Close the file
+        if((close(fileDescrip)) < 0)
         {
-            // child
-
-            char *cmdArg, *cmdLineArray[200], delimiter[2] = "\n";
-            int counterArg = 0;
-
-            if ((dup2(pipeToParent[1], STDERR_FILENO)) < 0)
-            {
-                perror("child dup stderr error ");
-                exit(errno);
-            }
-
-            if ((dup2(pipeToParent[1], STDOUT_FILENO)) < 0)
-            {
-                perror("child dup stdout error ");
-                exit(errno);
-            }
-
-            cmdArg = strtok(cmdLineStr, " ");
-
-            //walk through other cmdArgs
-            while( cmdArg != NULL ) 
-            {
-                cmdLineArray[counterArg] = malloc(strlen(cmdArg) + 1);
-
-                strncpy(cmdLineArray[counterArg], cmdArg, strlen(cmdArg));
-                                
-                cmdArg = strtok(NULL, " ");
-
-                counterArg++;
-            }
-            
-            cmdLineArray[counterArg] = NULL;
-
-            if(!(execvp(cmdLineArray[0], cmdLineArray)))
-            {
-                perror("Execlp child error ");
-                exit(errno);
-            }
-            
-            write(pipeToParent[1], "Bad command entered", strlen("Bad command entered"));
-
-            exit(1);
+            perror("Close file error ");
+            exit(errno);
         }
 
-        counterWhile++;
-        cmdLineStr = strtok(NULL, delimiter);
+        // Get the first command
+        cmdLineStr = strtok(dataBuffer, delimiter); // strtok starting
+
+        // Get each commands and execute them
+        while (cmdLineStr != NULL) // while strtok returns NULL
+        {
+
+            // Create a pipe --> [0] for reading || [1] for writing
+            if((pipe(pipeToParent)) < 0) // pipe creation
+            {
+                perror("pipe to parent error ");
+                exit(errno);
+            }
+
+            // Create a child
+            if((pid = fork()) < 0) // fork creation
+            {
+                perror("fork error ");
+                exit(errno);
+            }
+
+            // Code of the parent
+            if(pid)
+            {
+                int waitRespons, waitStatus = 1, timeout = 2000, counter = 0, readResponsParent = 1;
+                
+                // Wait until the child dies or the timeout expire
+                while(WIFEXITED(waitStatus) == 0 && timeout > counter)
+                {
+                    waitRespons = waitpid(pid, &waitStatus, WNOHANG);
+                    counter ++;
+                    sleep(0.1);
+                }
+
+                // If the timeout expire --> the child is killed
+                if (timeout <= counter)
+                {
+                    kill(pid, SIGKILL);
+                }
+
+                // Close the writing in the pipe for the parent
+                if((close(pipeToParent[1])) < 0)
+                {
+                    perror("Parent close writing pipe error ");
+                    exit(errno);
+                }
+                
+                // Print the counter of the file and the counter of the command
+                printf("\nResults parent %d|%d :\n", fileCounter, commandCounter);
+
+                // Read the entire response
+                while(readResponsParent != 0)
+                {
+                    char pipeBuffer[SIZE_OF_BUFFER] = "";
+                    
+                    // Read the informations in the pipe
+                    if((readResponsParent = read(pipeToParent[0], pipeBuffer, SIZE_OF_BUFFER)) < 0)
+                    {
+                        perror("Parent read error ");
+                        exit(errno);
+                    }
+                    
+                    // Print the informations read
+                    printf("%s", pipeBuffer);
+                }
+            }
+            // Code of the child
+            else
+            {
+                char *cmdArg, *cmdLineArray[200], delimiter[2] = "\n";
+                int counterArg = 0;
+
+                // Redirect the errors to the pipe
+                if ((dup2(pipeToParent[1], STDERR_FILENO)) < 0)
+                {
+                    perror("child dup stderr error ");
+                    exit(errno);
+                }
+
+                // Redirect the output to the pipe
+                if ((dup2(pipeToParent[1], STDOUT_FILENO)) < 0)
+                {
+                    perror("child dup stdout error ");
+                    exit(errno);
+                }
+
+                // Get the first word of the command
+                cmdArg = strtok(cmdLineStr, " ");
+
+                // Get all the word of the command
+                while( cmdArg != NULL ) 
+                {
+                    // Create space in memory of the size of the word
+                    cmdLineArray[counterArg] = malloc(strlen(cmdArg) + 1);
+
+                    // Move the word into the created memory
+                    strncpy(cmdLineArray[counterArg], cmdArg, strlen(cmdArg));
+                    
+                    cmdArg = strtok(NULL, " ");
+
+                    counterArg++;
+                }
+                
+                // The last word of the command is NULL
+                cmdLineArray[counterArg] = NULL;
+
+                // Execute the command 
+                if(!(execvp(cmdLineArray[0], cmdLineArray)))
+                {
+                    perror("Execlp child error ");
+                    exit(errno);
+                }
+                
+                // Write in the pipe an error if the command wasn't executed
+                write(pipeToParent[1], "Bad command entered", strlen("Bad command entered"));
+
+                // Exit the child with 1 --> the child didn't run his code successfully
+                exit(1);
+            }
+
+            // We go to the next command
+            commandCounter++;
+            cmdLineStr = strtok(NULL, delimiter);
+        }
     }
-
-    printf("End of file \n");
+    // The programme execute properly and a message is printed on the screen
+    printf("\nEnd of file \n");
     exit(0); // sucess
 }
