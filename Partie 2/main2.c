@@ -9,13 +9,14 @@
 #include <unistd.h>
 #include <string.h>
 
+
 int main(int argc, char *argv[])
 {
     pid_t pid, childpid;
-    int pipeToParent[2], fd, waitStatus, counterWhile = 1;
-    char dataBuffer[2000] = "", pipeBuffer[2000] = "", *cmdLineStr, delimiter[2] = "\n";
+    int pipeToParent[2], fd, waitStatus, counterWhile = 1, boolClosedPipeParent = 0;
+    char dataBuffer[2000] = "", *cmdLineStr, delimiter[2] = "\n";
 
-    if((fd = open("data.txt", O_RDONLY)) < 0) // file opening
+    if((fd = open(argv[1], O_RDONLY)) < 0) // file opening
     {
         perror("open error ");
         exit(errno);
@@ -35,15 +36,14 @@ int main(int argc, char *argv[])
 
     cmdLineStr = strtok(dataBuffer, delimiter); // strtok starting
 
+    if((pipe(pipeToParent)) < 0) // pipe creation
+    {
+        perror("pipe to parent error ");
+        exit(errno);
+    }
 
     while (cmdLineStr != NULL) // while strtok returns NULL
     {
-
-        if((pipe(pipeToParent)) < 0) // pipe creation
-        {
-            perror("pipe to parent error ");
-            exit(errno);
-        }
 
         if((pid = fork()) < 0) // fork creation
         {
@@ -51,54 +51,65 @@ int main(int argc, char *argv[])
             exit(errno);
         }
 
-
         if(pid)
         {
             // parent
+            int waitRespons, status = 1, timeout = 2000, counter = 0, readRespons;
+            char pipeBuffer[2000] = "";
+            // if (boolClosedPipeParent == 0)
+            // {
+            //     if((close(pipeToParent[1])) < 0) //close pipe writing
+            //     {
+            //         perror("Close pipe writing parent error ");
+            //         exit(errno);
+            //     }
+            //     boolClosedPipeParent = 1;
+            // }
 
-            if((close(pipeToParent[1])) < 0) // parent close pipe writing
+            while(WIFEXITED(status) == 0 && timeout > counter)
             {
-                perror("parent close pipe writing error ");
-                exit(errno);
+                waitRespons = waitpid(pid, &status, WNOHANG);
+                counter ++;
+                sleep(0.1);
             }
 
-            if((wait(NULL)) < 0) // wait until child dead
+            if (timeout <= counter)
             {
-                perror("parent wait error ");
-                exit(errno);
+                kill(pid, SIGKILL);
             }
 
-            if((read(pipeToParent[0], pipeBuffer, 2000)) < 0)
+            if((readRespons = read(pipeToParent[0], pipeBuffer, 2000)) < 0)
             {
                 perror("parent read error ");
                 exit(errno);
             }
 
-            if((close(pipeToParent[0])) < 0)
-            {
-                perror("close pipe reading error ");
-                exit(errno);
-            }
+            printf("Results parent %d :\n%s \n\n\n\n", counterWhile, pipeBuffer);
 
-            printf("Results parent %d: \n%s\n\n\n\n", counterWhile, pipeBuffer);
-
-            memset(pipeBuffer, 0, 2000);
-
-            counterWhile++;
+            // while(readRespons != 0)
+            // {
+                // printf("%s\n", pipeBuffer);
+            //     memset(pipeBuffer, 0, readRespons);
+            //     printf("read respons : %d\n", readRespons);
+            //     readRespons = read(pipeToParent[0], pipeBuffer, 2000);
+                
+                
+            //     // if((readRespons = read(pipeToParent[0], pipeBuffer, 2000)) < 0)
+            //     // {
+            //     //     perror("parent read error ");
+            //     //     exit(errno);
+            //     // }
+            // //     printf("ezeiuhezfiuhefziuhfze");
+            //     sleep(1);
+            // }
         }
 
         else
         {
             // child
 
-            char *cmdArg, *cmdLineArray[200];
+            char *cmdArg, *cmdLineArray[200], delimiter[2] = "\n";
             int counterArg = 0;
-
-            if((close(pipeToParent[0])) < 0)
-            {
-                perror("child close pipe reading error ");
-                exit(errno);
-            }
 
             if ((dup2(pipeToParent[1], STDERR_FILENO)) < 0)
             {
@@ -136,17 +147,13 @@ int main(int argc, char *argv[])
             
             write(pipeToParent[1], "Bad command entered", strlen("Bad command entered"));
 
-            if((close(pipeToParent[1])) < 0)
-            {
-                perror("child close pipe writing error ");
-                exit(errno);
-            }
             exit(1);
         }
 
+        counterWhile++;
         cmdLineStr = strtok(NULL, delimiter);
     }
 
-    printf("closed \n");
+    printf("End of file \n");
     exit(0); // sucess
 }
