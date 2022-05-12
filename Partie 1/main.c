@@ -31,12 +31,6 @@ int main(int argc, char *argv[])
     {
         // child code
        
-        if((close(pipeFD[0])) < 0) // close pipe reading
-        {
-            perror("Close pipe reading child error ");
-            exit(errno);
-        }
-
         if(!(dup2(pipeFD[1], STDERR_FILENO)))// replace stderr
         {
             perror("Dup2 STDERR error ");
@@ -69,31 +63,24 @@ int main(int argc, char *argv[])
 
         write(pipeFD[1], "Bad command entered", strlen("Bad command entered"));
 
-        if((close(pipeFD[1])) < 0)
-        {
-            perror("child close pipe writing error ");
-            exit(errno);
-        }
-
         exit(1);
     }
     else
     {
         // parent code
 
-        int respons, status = 1, timeout = 2000, counter = 0;
+        int waitRespons, status = 1, timeout = 2000, counter = 0;
         char bufferData[PATH_MAX];
-        struct stat sysStat;
 
         if((close(pipeFD[1])) < 0) //close pipe writing
         {
-            perror("Close pipe writing child error ");
+            perror("Close pipe writing parent error ");
             exit(errno);
         }
 
         while(WIFEXITED(status) == 0 && timeout > counter)
         {
-            respons = waitpid(pid, &status, WNOHANG);
+            waitRespons = waitpid(pid, &status, WNOHANG);
             counter ++;
             sleep(0.1);
         }
@@ -104,24 +91,14 @@ int main(int argc, char *argv[])
             printf("Child process time out\n");
         }
 
-        int readRespons = read(pipeFD[0], bufferData, sysStat.st_size);
-        
-        if ((close (pipeFD[0])) == -1)
-        {
-            perror("Close pipe reading parent error ");
-            exit(errno);
-        }
-
-
-        if (readRespons == -1)
+        if ((read(pipeFD[0], bufferData, PATH_MAX)) == -1)
         {
             perror("Read error ");
             exit(errno);
         }
         
-
         printf("Results :\n%s\n", bufferData);
 
     }
-    return 1;
+    exit(0);
 }
