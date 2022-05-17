@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
         cmdLineStr = strtok(dataBuffer, delimiter); // strtok starting
 
         // Get each commands and execute them
-        while (cmdLineStr != NULL) // while strtok returns NULL
+        while (cmdLineStr != NULL) // while strtok returns not NULL
         {
 
             // Create a pipe --> [0] for reading || [1] for writing
@@ -67,18 +67,18 @@ int main(int argc, char *argv[])
             // Code of the parent
             if(pid)
             {
-                int waitRespons, waitStatus = 1, timeout = 2000, counter = 0, readResponsParent = 1;
+                int waitRespons, waitStatus = 1, timeout = 2000, timeOutCounter = 0;
                 
                 // Wait until the child dies or the timeout expire
-                while(WIFEXITED(waitStatus) == 0 && timeout > counter)
+                while(WIFEXITED(waitStatus) == 0 && timeout > timeOutCounter)
                 {
                     waitRespons = waitpid(pid, &waitStatus, WNOHANG);
-                    counter ++;
+                    timeOutCounter ++;
                     sleep(0.1);
                 }
 
                 // If the timeout expire --> the child is killed
-                if (timeout <= counter)
+                if (timeout <= timeOutCounter)
                 {
                     kill(pid, SIGKILL);
                 }
@@ -168,7 +168,7 @@ int main(int argc, char *argv[])
             cmdLineStr = strtok(NULL, delimiter);
         }
     }
-    // The programme execute properly and a message is printed on the screen
+    // The programme was executed properly and a message is printed on the screen
     printf("\nEnd of file \n");
     exit(0); // sucess
 }
