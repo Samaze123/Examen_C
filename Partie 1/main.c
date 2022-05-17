@@ -1,11 +1,9 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <linux/limits.h>
 #include <unistd.h>
 #include <string.h>
 
@@ -15,7 +13,7 @@ int main(int argc, char *argv[])
 
     int pipeFD[2];
 
-    if((pipe(pipeFD)) < 0)
+    if((pipe(pipeFD)) < 0) // pipeFD[0] pour la lecture 
     {
         perror("Pipe error ");
         exit(errno);
@@ -27,7 +25,7 @@ int main(int argc, char *argv[])
         exit(errno);
     }
 
-    if (!pid)
+    if (pid == 0)
     {
         // child code
        
@@ -47,7 +45,7 @@ int main(int argc, char *argv[])
         
         if (argc > 1)
         {
-            commandLine[0] = argv[1];
+            commandLine[0] = argv[1]; //argv[0] c'est le nom du programme
             for (int i = 0; i < argc; ++i)
             {
                 commandLine[i+1] = argv[i+2];
@@ -69,14 +67,7 @@ int main(int argc, char *argv[])
     {
         // parent code
 
-        int waitRespons, status = 1, timeout = 2000, counter = 0;
-        char bufferData[PATH_MAX];
-
-        if((close(pipeFD[1])) < 0) //close pipe writing
-        {
-            perror("Close pipe writing parent error ");
-            exit(errno);
-        }
+        int waitRespons, status = 1, timeout = 2000, counter = 0, readResponsParent = 1;
 
         while(WIFEXITED(status) == 0 && timeout > counter)
         {
@@ -91,14 +82,30 @@ int main(int argc, char *argv[])
             printf("Child process time out\n");
         }
 
-        if ((read(pipeFD[0], bufferData, PATH_MAX)) == -1)
+        if((close(pipeFD[1])) < 0) //close pipe writing
         {
-            perror("Read error ");
+            perror("Close pipe writing parent error ");
             exit(errno);
         }
-        
-        printf("Results :\n%s\n", bufferData);
 
+        // Print the counter of the file and the counter of the command
+        printf("\nResults parent :\n");
+
+        // Read the entire response
+        while(readResponsParent != 0)
+        {
+            char bufferData[2000] = "";
+            
+            // Read the informations in the pipe
+            if((readResponsParent = read(pipeFD[0], bufferData, 2000)) < 0)
+            {
+                perror("Parent read error ");
+                exit(errno);
+            }
+            
+            // Print the informations read
+            printf("%s", bufferData);
+        }
     }
     exit(0);
 }
