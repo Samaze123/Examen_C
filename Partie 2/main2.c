@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
             // Code of the parent
             if(pid)
             {
-                int waitRespons, waitStatus = 1, timeout = 2000, timeOutCounter = 0;
+                int waitRespons, waitStatus = 1, timeout = 2000, timeOutCounter = 0, readResponsParent = 1;
                 
                 // Wait until the child dies or the timeout expire
                 while(WIFEXITED(waitStatus) == 0 && timeout > timeOutCounter)
